@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "622570988215",
+    "project_id": "mimamori-app-75fcf",
+    "storage_bucket": "mimamori-app-75fcf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622570988215:android:9eaa423f4d7af14c1c2332",
+        "android_client_info": {
+          "package_name": "com.example.mimamori_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9f7CYg-0NoX6BmHIIqPFYnoWtMC6Oc-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:622570988215:android:48d3ae543427b5401c2332",
+        "android_client_info": {
+          "package_name": "com.example.my_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9f7CYg-0NoX6BmHIIqPFYnoWtMC6Oc-o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
