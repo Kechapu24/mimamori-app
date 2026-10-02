@@ -42,19 +42,21 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyAFblOBBUqVB4HxA0WN9NrWIo4hUsLmkKI',
-    appId: '1:622570988215:web:57a47cbc5da8d4431c2332',
+    appId: '1:622570988215:web:ae2e76a3653f32871c2332',
     messagingSenderId: '622570988215',
     projectId: 'mimamori-app-75fcf',
     authDomain: 'mimamori-app-75fcf.firebaseapp.com',
+    databaseURL: 'https://mimamori-app-75fcf-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'mimamori-app-75fcf.firebasestorage.app',
-    measurementId: 'G-DJ8NGGG63N',
+    measurementId: 'G-2Y6J1EX0HV',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyA9f7CYg-0NoX6BmHIIqPFYnoWtMC6Oc-o',
-    appId: '1:622570988215:android:48d3ae543427b5401c2332',
+    appId: '1:622570988215:android:9eaa423f4d7af14c1c2332',
     messagingSenderId: '622570988215',
     projectId: 'mimamori-app-75fcf',
+    databaseURL: 'https://mimamori-app-75fcf-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'mimamori-app-75fcf.firebasestorage.app',
   );
 
@@ -63,6 +65,7 @@ class DefaultFirebaseOptions {
     appId: '1:622570988215:ios:c0b5455f6c08c72c1c2332',
     messagingSenderId: '622570988215',
     projectId: 'mimamori-app-75fcf',
+    databaseURL: 'https://mimamori-app-75fcf-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'mimamori-app-75fcf.firebasestorage.app',
     iosBundleId: 'com.example.myApp',
   );
@@ -72,17 +75,20 @@ class DefaultFirebaseOptions {
     appId: '1:622570988215:ios:c0b5455f6c08c72c1c2332',
     messagingSenderId: '622570988215',
     projectId: 'mimamori-app-75fcf',
+    databaseURL: 'https://mimamori-app-75fcf-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'mimamori-app-75fcf.firebasestorage.app',
     iosBundleId: 'com.example.myApp',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyAFblOBBUqVB4HxA0WN9NrWIo4hUsLmkKI',
-    appId: '1:622570988215:web:4298a88ff63591481c2332',
+    appId: '1:622570988215:web:57a47cbc5da8d4431c2332',
     messagingSenderId: '622570988215',
     projectId: 'mimamori-app-75fcf',
     authDomain: 'mimamori-app-75fcf.firebaseapp.com',
+    databaseURL: 'https://mimamori-app-75fcf-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'mimamori-app-75fcf.firebasestorage.app',
-    measurementId: 'G-DTQY2TYVVV',
+    measurementId: 'G-DJ8NGGG63N',
   );
+
 }
