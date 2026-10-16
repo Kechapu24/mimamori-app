@@ -32,13 +32,56 @@ class _LoginPageState extends State<LoginPage> {
       String message = 'ログインに失敗しました';
       if (e.code == 'user-not-found') message = 'メールアドレスが見つかりません';
       if (e.code == 'wrong-password') message = 'パスワードが間違っています';
+      if (e.code == 'invalid-credential') message = 'メールアドレスまたはパスワードが間違っています';
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  //　新規登録処理
+  Future<void> _signUp() async {
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+      // 登録成功　→　次の画面へ（後で追加）
+      print('新規登録成功！');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('新規登録が完了しました')));
+      }
+    } on FirebaseAuthException catch (e) {
+      // エラーメッセージを日本語で表示
+      String message = '新規登録に失敗しました';
+      if (e.code == 'email-already-in-use') message = 'このメールアドレスは既に使われています';
+      if (e.code == 'weak-password') message = 'パスワードは6文字以上にしてください';
+      if (e.code == 'invalid-email') message = 'メールアドレスの形式が正しくありません';
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   @override
@@ -70,7 +113,19 @@ class _LoginPageState extends State<LoginPage> {
             //　ローディング中にはぐるぐる、それ以外はボタンを表示
             _isLoading
                 ? const CircularProgressIndicator()
-                : ElevatedButton(onPressed: _login, child: const Text('ログイン')),
+                : Column(
+                    children: [
+                      ElevatedButton(
+                        onPressed: _login,
+                        child: const Text('ログイン'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _signUp,
+                        child: const Text('新規登録はこちら'),
+                      ),
+                    ],
+                  ),
           ],
         ),
       ),
