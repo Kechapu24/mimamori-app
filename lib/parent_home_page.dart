@@ -41,20 +41,26 @@ class _ParentHomePageState extends State<ParentHomePage> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+    final db = FirebaseFirestore.instance;
+    final userRef = db.collection('users').doc(uid);
     final snapshot = await userRef.get();
 
-    if (snapshot.exists && snapshot.data()?['inviteCode'] != null) {
-      // 既にコードがある場合はそれを使う
+    final existingCode = snapshot.data()?['inviteCode'] as String?;
+    if (existingCode != null) {
+      // 旧方式で発行済みのコードも inviteCodes に登録しておく
+      final codeRef = db.collection('inviteCodes').doc(existingCode);
+      if (!(await codeRef.get()).exists) {
+        await codeRef.set({'parentUid': uid});
+      }
+      if (!mounted) return;
       setState(() {
-        _inviteCode = snapshot.data()!['inviteCode'];
+        _inviteCode = existingCode;
         _isLoadingCode = false;
       });
       return;
     }
 
-    // 未発行の場合、重複しないコードを生成して保存
-    final newCode = await _generateUniqueCode();
+    final newCode = await _createUniqueInviteCode(uid);
     await userRef.set({
       'role': 'parent',
       'inviteCode': newCode,
@@ -67,16 +73,15 @@ class _ParentHomePageState extends State<ParentHomePage> {
     });
   }
 
-  /// Firestore上で重複していないコードになるまで再生成
-  Future<String> _generateUniqueCode() async {
+  /// 重複しないコードを生成し、inviteCodes に登録して返す
+  Future<String> _createUniqueInviteCode(String uid) async {
+    final db = FirebaseFirestore.instance;
     while (true) {
       final code = InviteCodeGenerator.generate();
-      final existing = await FirebaseFirestore.instance
-          .collection('users')
-          .where('inviteCode', isEqualTo: code)
-          .limit(1)
-          .get();
-      if (existing.docs.isEmpty) return code;
+      final ref = db.collection('inviteCodes').doc(code);
+      if ((await ref.get()).exists) continue;
+      await ref.set({'parentUid': uid});
+      return code;
     }
   }
 
@@ -89,17 +94,15 @@ class _ParentHomePageState extends State<ParentHomePage> {
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'role': 'parent',
       'steps': int.tryParse(_stepsController.text) ?? 0,
-      'updatedAt': FieldValue.serverTimestamp(), // リアルタイム検証
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('歩数を保存しました')));
-    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('歩数を保存しました')));
   }
 
   Widget _buildInviteCodeCard() {
@@ -125,7 +128,6 @@ class _ParentHomePageState extends State<ParentHomePage> {
       ),
     );
   }
-  // ...(_ensureInviteCode, _generateUniqueCode, _saveSteps, _buildInviteCodeCard は変更なしなので省略)
 
   /// Health Connectから今日の歩数を取得し、入力欄に反映する
   Future<void> _syncFromHealthConnect() async {
@@ -307,7 +309,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
             const SizedBox(height: 16),
             _buildSyncButton(),
             const SizedBox(height: 8),
-            _buildTestDataButton(), // テストボタンの呼び出し
+            _buildTestDataButton(),
             const SizedBox(height: 16),
             TextField(
               controller: _stepsController,

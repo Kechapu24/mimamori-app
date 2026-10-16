@@ -46,7 +46,7 @@ class _ChildHomePageState extends State<ChildHomePage> {
     });
   }
 
-  /// 招待コードを検索し、見つかった親のuidを自分のドキュメントに保存する
+  /// 招待コードから親のuidを取得し、自分のドキュメントに保存する
   Future<void> _linkWithCode() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final code = _codeController.text.trim().toUpperCase();
@@ -57,13 +57,14 @@ class _ChildHomePageState extends State<ChildHomePage> {
       _linkError = null;
     });
 
-    final result = await FirebaseFirestore.instance
-        .collection('users')
-        .where('inviteCode', isEqualTo: code)
-        .limit(1)
+    // inviteCodes コレクションからコードを1件だけ取得する
+    final codeDoc = await FirebaseFirestore.instance
+        .collection('inviteCodes')
+        .doc(code)
         .get();
 
-    if (result.docs.isEmpty) {
+    if (!codeDoc.exists) {
+      if (!mounted) return;
       setState(() {
         _isLinking = false;
         _linkError = 'コードが見つかりませんでした';
@@ -71,7 +72,7 @@ class _ChildHomePageState extends State<ChildHomePage> {
       return;
     }
 
-    final parentUid = result.docs.first.id;
+    final parentUid = codeDoc.data()!['parentUid'] as String;
 
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'role': 'child',
@@ -150,7 +151,7 @@ class _ChildHomePageState extends State<ChildHomePage> {
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final steps = data['steps'] ?? 0;
 
-        // 最終更新時刻を整形（未保存の場合は null のまま）
+        // 最終更新時刻を整形（未保存の場合は '---'）
         final Timestamp? updatedAt = data['updatedAt'] as Timestamp?;
         final String updatedAtText = updatedAt == null
             ? '---'
