@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/invite_code_generator.dart';
+import 'services/background_sync_service.dart'; // ← 追加
 
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
@@ -129,62 +130,33 @@ class _ParentHomePageState extends State<ParentHomePage> {
     );
   }
 
-  /// Health Connectから今日の歩数を取得し、入力欄に反映する
-  Future<void> _syncFromHealthConnect() async {
+  /// Health Connect から取得して Firestore に直接保存する（UI更新も行う）
+  Future<void> _syncAndSave() async {
     setState(() {
       _isSyncing = true;
       _syncError = null;
     });
 
-    try {
-      // Android: 歩数取得に必要な Activity Recognition 権限をリクエスト
-      final activityStatus = await Permission.activityRecognition.request();
-      if (!activityStatus.isGranted) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = '活動認識の権限が許可されませんでした';
-        });
-        return;
-      }
+    final steps = await BackgroundSyncService.syncStepsToFirestore();
 
-      // Health Connectへのアクセス権限をリクエスト
-      final types = [HealthDataType.STEPS];
-      final requested = await _health.requestAuthorization(types);
+    if (!mounted) return;
 
-      if (!requested) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = 'Health Connectへのアクセスが許可されませんでした';
-        });
-        return;
-      }
-
-      // 今日の0時から現在までの歩数を取得
-      final now = DateTime.now();
-      final midnight = DateTime(now.year, now.month, now.day);
-      final steps = await _health.getTotalStepsInInterval(midnight, now);
-
-      if (!mounted) return;
-
-      if (steps == null) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = '歩数データが取得できませんでした';
-        });
-        return;
-      }
-
-      setState(() {
-        _stepsController.text = steps.toString();
-        _isSyncing = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
+    if (steps == null) {
       setState(() {
         _isSyncing = false;
-        _syncError = 'エラーが発生しました: $e';
+        _syncError = 'Health Connect から歩数を取得できませんでした';
       });
+      return;
     }
+
+    setState(() {
+      _stepsController.text = steps.toString();
+      _isSyncing = false;
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('歩数を同期・保存しました')));
   }
 
   bool _isWritingTestData = false;
@@ -273,7 +245,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
     return Column(
       children: [
         OutlinedButton.icon(
-          onPressed: _isSyncing ? null : _syncFromHealthConnect,
+          onPressed: _isSyncing ? null : _syncAndSave,
           icon: _isSyncing
               ? const SizedBox(
                   width: 16,

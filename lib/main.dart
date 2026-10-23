@@ -4,10 +4,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'login_page.dart';
 import 'role_page.dart';
+import 'services/notification_service.dart';
+import 'services/background_sync_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService.initialize();
+  await BackgroundSyncService.registerPeriodicSync();
   runApp(const MyApp());
 }
 
