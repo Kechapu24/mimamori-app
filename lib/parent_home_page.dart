@@ -4,7 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/invite_code_generator.dart';
-import 'services/background_sync_service.dart'; // ← 追加
+import 'services/background_sync_service.dart';
+import 'services/notification_service.dart';
 
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
@@ -298,6 +299,21 @@ class _ParentHomePageState extends State<ParentHomePage> {
                     onPressed: _saveSteps,
                     child: const Text('保存する'),
                   ),
+            // 【テスト用】通知確認ボタン
+            ElevatedButton(
+              onPressed: () async {
+                // Firestoreの歩数を一時的に100に書き換えてから通知チェック
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid == null) return;
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .set({'steps': 100}, SetOptions(merge: true));
+                await NotificationService.checkAndNotify();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('【テスト】通知を確認する'),
+            ),
           ],
         ),
       ),

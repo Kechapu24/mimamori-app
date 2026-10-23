@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class ChildHomePage extends StatefulWidget {
   const ChildHomePage({super.key});
@@ -44,6 +45,29 @@ class _ChildHomePageState extends State<ChildHomePage> {
       _linkedParentId = snapshot.data()?['linkedParentId'];
       _isLoadingLink = false;
     });
+    await _saveFcmToken();
+  }
+
+  /// FCMトークンを取得してFirestoreに保存する
+  Future<void> _saveFcmToken() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final messaging = FirebaseMessaging.instance;
+
+    // 通知権限をリクエスト
+    await messaging.requestPermission();
+
+    // トークンを取得
+    final token = await messaging.getToken();
+    if (token == null) return;
+
+    // Firestoreに保存
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'fcmToken': token,
+    }, SetOptions(merge: true));
+
+    print('FCMトークン保存完了: $token');
   }
 
   /// 招待コードから親のuidを取得し、自分のドキュメントに保存する

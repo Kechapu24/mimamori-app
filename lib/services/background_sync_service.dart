@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
+import 'notification_service.dart';
 
 const taskName = 'mimamori_hourly_sync';
 
@@ -11,6 +12,7 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     if (task == taskName) {
       await BackgroundSyncService.syncStepsToFirestore();
+      await NotificationService.checkAndNotify(); // ← 追加
     }
     return Future.value(true);
   });
@@ -22,7 +24,7 @@ class BackgroundSyncService {
   static Future<void> registerPeriodicSync() async {
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: true, // ← trueに変更（ログが出るようになる）
+      isInDebugMode: true,
     );
 
     await Workmanager().registerPeriodicTask(
@@ -30,10 +32,10 @@ class BackgroundSyncService {
       taskName,
       frequency: const Duration(hours: 1),
       constraints: Constraints(networkType: NetworkType.connected),
-      existingWorkPolicy: ExistingWorkPolicy.replace, // ← keepからreplaceに変更
+      existingWorkPolicy: ExistingWorkPolicy.replace,
     );
 
-    print('WorkManager: タスク登録完了 - $taskName'); // ← 追加
+    print('WorkManager: タスク登録完了 - $taskName');
   }
 
   static Future<int?> syncStepsToFirestore() async {
