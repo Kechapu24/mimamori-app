@@ -44,6 +44,9 @@ dependencies:
   flutter_local_notifications: ^18.0.0
   firebase_messaging: ^16.4.1 
 
+  qr_flutter: ^4.1.0       # QRコード表示（高齢者側）
+  mobile_scanner: ^5.2.3   # カメラでQR読み取り（見守り側）
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

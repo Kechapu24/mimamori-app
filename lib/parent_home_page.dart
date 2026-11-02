@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../utils/invite_code_generator.dart';
 import 'services/background_sync_service.dart';
 import 'services/notification_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
@@ -115,16 +116,28 @@ class _ParentHomePageState extends State<ParentHomePage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text('招待コード', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            // QRコード表示
+            QrImageView(
+              data: _inviteCode ?? '',
+              version: QrVersions.auto,
+              size: 180,
+            ),
+            const SizedBox(height: 8),
+            // テキストでも表示
             SelectableText(
               _inviteCode ?? '---',
               style: const TextStyle(fontSize: 24, letterSpacing: 2),
             ),
             const SizedBox(height: 4),
-            const Text('このコードを子デバイスに入力してください', style: TextStyle(fontSize: 12)),
+            const Text(
+              'このコードまたはQRコードを子デバイスに読み取らせてください',
+              style: TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

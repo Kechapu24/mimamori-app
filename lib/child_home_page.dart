@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'NotificationPage/notification_page.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'pages/qr_scanner_page.dart';
 
 class ChildHomePage extends StatefulWidget {
   const ChildHomePage({super.key});
@@ -22,12 +25,30 @@ class _ChildHomePageState extends State<ChildHomePage> {
   void initState() {
     super.initState();
     _checkExistingLink();
+    _initFcm();
   }
 
   @override
   void dispose() {
     _codeController.dispose();
     super.dispose();
+  }
+
+  /// FCM受信処理の初期化
+  void _initFcm() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('FCM受信: ${message.notification?.title}');
+      print('FCM本文: ${message.notification?.body}');
+
+      if (message.notification != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message.notification!.title ?? 'お知らせ'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
   }
 
   /// 自分がすでに親と紐づいているか確認する
@@ -45,6 +66,7 @@ class _ChildHomePageState extends State<ChildHomePage> {
       _linkedParentId = snapshot.data()?['linkedParentId'];
       _isLoadingLink = false;
     });
+
     await _saveFcmToken();
   }
 
@@ -54,20 +76,29 @@ class _ChildHomePageState extends State<ChildHomePage> {
     if (uid == null) return;
 
     final messaging = FirebaseMessaging.instance;
-
-    // 通知権限をリクエスト
     await messaging.requestPermission();
 
-    // トークンを取得
     final token = await messaging.getToken();
     if (token == null) return;
 
-    // Firestoreに保存
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'fcmToken': token,
     }, SetOptions(merge: true));
 
     print('FCMトークン保存完了: $token');
+  }
+
+  /// QRコードを読み取って招待コードを取得する
+  Future<void> _scanQrCode() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (context) => const QrScannerPage()),
+    );
+
+    if (result != null) {
+      _codeController.text = result;
+      await _linkWithCode();
+    }
   }
 
   /// 招待コードから親のuidを取得し、自分のドキュメントに保存する
@@ -81,7 +112,6 @@ class _ChildHomePageState extends State<ChildHomePage> {
       _linkError = null;
     });
 
-    // inviteCodes コレクションからコードを1件だけ取得する
     final codeDoc = await FirebaseFirestore.instance
         .collection('inviteCodes')
         .doc(code)
@@ -119,11 +149,20 @@ class _ChildHomePageState extends State<ChildHomePage> {
         children: [
           const Text('招待コードを入力', style: TextStyle(fontSize: 20)),
           const SizedBox(height: 16),
+          // QRコード読み取りボタン
+          OutlinedButton.icon(
+            onPressed: _scanQrCode,
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('QRコードを読み取る'),
+          ),
+          const SizedBox(height: 16),
+          const Text('または', style: TextStyle(color: Colors.grey)),
+          const SizedBox(height: 16),
           TextField(
             controller: _codeController,
             textCapitalization: TextCapitalization.characters,
             decoration: const InputDecoration(
-              labelText: '招待コード',
+              labelText: '招待コードを手入力',
               border: OutlineInputBorder(),
             ),
           ),
@@ -175,7 +214,6 @@ class _ChildHomePageState extends State<ChildHomePage> {
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final steps = data['steps'] ?? 0;
 
-        // 最終更新時刻を整形（未保存の場合は '---'）
         final Timestamp? updatedAt = data['updatedAt'] as Timestamp?;
         final String updatedAtText = updatedAt == null
             ? '---'
@@ -204,13 +242,26 @@ class _ChildHomePageState extends State<ChildHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('子ホーム')),
+      appBar: AppBar(
+        title: const Text('子ホーム'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NotificationPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: Center(
         child: _isLoadingLink
             ? const CircularProgressIndicator()
-            : _linkedParentId == null
-            ? _buildLinkForm()
-            : _buildStepsView(),
+            : (_linkedParentId == null ? _buildLinkForm() : _buildStepsView()),
       ),
     );
   }
