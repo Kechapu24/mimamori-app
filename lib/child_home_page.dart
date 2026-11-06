@@ -239,6 +239,12 @@ class _ChildHomePageState extends State<ChildHomePage> {
     );
   }
 
+  /// ログアウト（重なっている画面を閉じてからサインアウト）
+  Future<void> _logout() async {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await FirebaseAuth.instance.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -255,6 +261,11 @@ class _ChildHomePageState extends State<ChildHomePage> {
                 ),
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'ログアウト',
+            onPressed: _logout,
           ),
         ],
       ),

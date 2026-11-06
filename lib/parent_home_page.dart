@@ -108,6 +108,12 @@ class _ParentHomePageState extends State<ParentHomePage> {
     ).showSnackBar(const SnackBar(content: Text('歩数を保存しました')));
   }
 
+  /// ログアウト（重なっている画面を閉じてからサインアウト）
+  Future<void> _logout() async {
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await FirebaseAuth.instance.signOut();
+  }
+
   Widget _buildInviteCodeCard() {
     if (_isLoadingCode) {
       return const CircularProgressIndicator();
@@ -283,7 +289,16 @@ class _ParentHomePageState extends State<ParentHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('親ホーム')),
+            appBar: AppBar(
+        title: const Text('親ホーム'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'ログアウト',
+            onPressed: _logout,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
