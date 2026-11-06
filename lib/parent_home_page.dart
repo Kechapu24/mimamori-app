@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:health/health.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../utils/invite_code_generator.dart';
+import 'services/background_sync_service.dart';
+import 'services/notification_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class ParentHomePage extends StatefulWidget {
   const ParentHomePage({super.key});
@@ -41,20 +44,26 @@ class _ParentHomePageState extends State<ParentHomePage> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
+    final db = FirebaseFirestore.instance;
+    final userRef = db.collection('users').doc(uid);
     final snapshot = await userRef.get();
 
-    if (snapshot.exists && snapshot.data()?['inviteCode'] != null) {
-      // 既にコードがある場合はそれを使う
+    final existingCode = snapshot.data()?['inviteCode'] as String?;
+    if (existingCode != null) {
+      // 旧方式で発行済みのコードも inviteCodes に登録しておく
+      final codeRef = db.collection('inviteCodes').doc(existingCode);
+      if (!(await codeRef.get()).exists) {
+        await codeRef.set({'parentUid': uid});
+      }
+      if (!mounted) return;
       setState(() {
-        _inviteCode = snapshot.data()!['inviteCode'];
+        _inviteCode = existingCode;
         _isLoadingCode = false;
       });
       return;
     }
 
-    // 未発行の場合、重複しないコードを生成して保存
-    final newCode = await _generateUniqueCode();
+    final newCode = await _createUniqueInviteCode(uid);
     await userRef.set({
       'role': 'parent',
       'inviteCode': newCode,
@@ -67,16 +76,15 @@ class _ParentHomePageState extends State<ParentHomePage> {
     });
   }
 
-  /// Firestore上で重複していないコードになるまで再生成
-  Future<String> _generateUniqueCode() async {
+  /// 重複しないコードを生成し、inviteCodes に登録して返す
+  Future<String> _createUniqueInviteCode(String uid) async {
+    final db = FirebaseFirestore.instance;
     while (true) {
       final code = InviteCodeGenerator.generate();
-      final existing = await FirebaseFirestore.instance
-          .collection('users')
-          .where('inviteCode', isEqualTo: code)
-          .limit(1)
-          .get();
-      if (existing.docs.isEmpty) return code;
+      final ref = db.collection('inviteCodes').doc(code);
+      if ((await ref.get()).exists) continue;
+      await ref.set({'parentUid': uid});
+      return code;
     }
   }
 
@@ -89,17 +97,15 @@ class _ParentHomePageState extends State<ParentHomePage> {
     await FirebaseFirestore.instance.collection('users').doc(uid).set({
       'role': 'parent',
       'steps': int.tryParse(_stepsController.text) ?? 0,
-      'updatedAt': FieldValue.serverTimestamp(), // リアルタイム検証
+      'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
     if (!mounted) return;
     setState(() => _isSaving = false);
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('歩数を保存しました')));
-    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('歩数を保存しました')));
   }
 
   Widget _buildInviteCodeCard() {
@@ -110,79 +116,61 @@ class _ParentHomePageState extends State<ParentHomePage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             const Text('招待コード', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
+            // QRコード表示
+            QrImageView(
+              data: _inviteCode ?? '',
+              version: QrVersions.auto,
+              size: 180,
+            ),
+            const SizedBox(height: 8),
+            // テキストでも表示
             SelectableText(
               _inviteCode ?? '---',
               style: const TextStyle(fontSize: 24, letterSpacing: 2),
             ),
             const SizedBox(height: 4),
-            const Text('このコードを子デバイスに入力してください', style: TextStyle(fontSize: 12)),
+            const Text(
+              'このコードまたはQRコードを子デバイスに読み取らせてください',
+              style: TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
     );
   }
-  // ...(_ensureInviteCode, _generateUniqueCode, _saveSteps, _buildInviteCodeCard は変更なしなので省略)
 
-  /// Health Connectから今日の歩数を取得し、入力欄に反映する
-  Future<void> _syncFromHealthConnect() async {
+  /// Health Connect から取得して Firestore に直接保存する（UI更新も行う）
+  Future<void> _syncAndSave() async {
     setState(() {
       _isSyncing = true;
       _syncError = null;
     });
 
-    try {
-      // Android: 歩数取得に必要な Activity Recognition 権限をリクエスト
-      final activityStatus = await Permission.activityRecognition.request();
-      if (!activityStatus.isGranted) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = '活動認識の権限が許可されませんでした';
-        });
-        return;
-      }
+    final steps = await BackgroundSyncService.syncStepsToFirestore();
 
-      // Health Connectへのアクセス権限をリクエスト
-      final types = [HealthDataType.STEPS];
-      final requested = await _health.requestAuthorization(types);
+    if (!mounted) return;
 
-      if (!requested) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = 'Health Connectへのアクセスが許可されませんでした';
-        });
-        return;
-      }
-
-      // 今日の0時から現在までの歩数を取得
-      final now = DateTime.now();
-      final midnight = DateTime(now.year, now.month, now.day);
-      final steps = await _health.getTotalStepsInInterval(midnight, now);
-
-      if (!mounted) return;
-
-      if (steps == null) {
-        setState(() {
-          _isSyncing = false;
-          _syncError = '歩数データが取得できませんでした';
-        });
-        return;
-      }
-
-      setState(() {
-        _stepsController.text = steps.toString();
-        _isSyncing = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
+    if (steps == null) {
       setState(() {
         _isSyncing = false;
-        _syncError = 'エラーが発生しました: $e';
+        _syncError = 'Health Connect から歩数を取得できませんでした';
       });
+      return;
     }
+
+    setState(() {
+      _stepsController.text = steps.toString();
+      _isSyncing = false;
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('歩数を同期・保存しました')));
   }
 
   bool _isWritingTestData = false;
@@ -271,7 +259,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
     return Column(
       children: [
         OutlinedButton.icon(
-          onPressed: _isSyncing ? null : _syncFromHealthConnect,
+          onPressed: _isSyncing ? null : _syncAndSave,
           icon: _isSyncing
               ? const SizedBox(
                   width: 16,
@@ -307,7 +295,7 @@ class _ParentHomePageState extends State<ParentHomePage> {
             const SizedBox(height: 16),
             _buildSyncButton(),
             const SizedBox(height: 8),
-            _buildTestDataButton(), // テストボタンの呼び出し
+            _buildTestDataButton(),
             const SizedBox(height: 16),
             TextField(
               controller: _stepsController,
@@ -324,6 +312,21 @@ class _ParentHomePageState extends State<ParentHomePage> {
                     onPressed: _saveSteps,
                     child: const Text('保存する'),
                   ),
+            // 【テスト用】通知確認ボタン
+            ElevatedButton(
+              onPressed: () async {
+                // Firestoreの歩数を一時的に100に書き換えてから通知チェック
+                final uid = FirebaseAuth.instance.currentUser?.uid;
+                if (uid == null) return;
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(uid)
+                    .set({'steps': 100}, SetOptions(merge: true));
+                await NotificationService.checkAndNotify();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('【テスト】通知を確認する'),
+            ),
           ],
         ),
       ),
